@@ -4,11 +4,17 @@
   "description": "Api for chess9b60.com",
   "main": "index.js",
   "scripts": {
-    "start": "ts-node index.js"
+    "start": "nodemon ts-node index.js"
   },
   "author": "",
   "dependencies": {
+    "express": "^4.17.3",
+    "heap": "^0.2.7",
+    "socket.io": "^4.4.1",
     "ts-node": "^10.7.0",
     "typescript": "^4.6.2"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.15"
   }
 }
