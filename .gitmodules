@@ -1,0 +1,4 @@
+[submodule "chess9b60"]
+	path = chess9b60
+	url = https://github.com/willdunklin/chess9billion60.git
+	branch = logic_only
