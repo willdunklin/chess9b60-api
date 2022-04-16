@@ -1,5 +1,6 @@
 import { create, get, join } from './api';
 import express from 'express';
+import cors from 'cors';
 import { Response } from 'express-serve-static-core';
 
 const app = express();
@@ -10,6 +11,8 @@ const error = (res: Response<any, Record<string, any>, number>, err: string) => 
     console.error(err);
     res.status(500).send('Internal server error');
 }
+
+app.use(cors());
 
 app.post('/game', (req, res) => {
   get(req.body.id, req.body.token).then(result => res.send(JSON.stringify(result)))
@@ -28,7 +31,6 @@ app.post('/pool', (req, res) => {
   join(req.body.token, res)
     .catch(err => error(res, err.message));
 });
-
 
 const PORT = (process.env.NODE_ENV === "production") ? process.env.PORT || 8080 : 8080;
 app.listen(PORT, () =>
