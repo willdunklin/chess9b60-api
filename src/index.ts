@@ -1,32 +1,37 @@
 import { create, get, join } from './api';
 import express from 'express';
+import { Response } from 'express-serve-static-core';
+
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+const error = (res: Response<any, Record<string, any>, number>, err: string) => {
+    console.error(err);
+    res.status(500).send('Internal server error');
+}
 
 app.post('/game', (req, res) => {
-  console.log('getting game');
   get(req.body.id, req.body.token).then(result => res.send(JSON.stringify(result)))
-  // return res.send('Getting game ' + req.body.id);
+    .catch(err => error(res, err.message));
 });
 
 app.post('/create', (req, res) => {
-  // console.log(req.body);
-  create(req.body.time, req.body.increment, req.body.timer, null, req.body.token)
+  create(req.body.time, req.body.increment, req.body.timer, req.body.black, req.body.white)
     .then(result => {
       res.send(JSON.stringify(result))
-    });
-  // return res.send('Creating a game');
+    })
+    .catch(err => error(res, err.message));
 });
 
 app.post('/pool', (req, res) => {
-  // console.log(req.body);
-  join(req.body.token, res);
+  console.log('pool', req.body);
+  join(req.body.token, res)
+    .catch(err => error(res, err.message));
 });
 
 
-const PORT = (process.env.NODE_ENV === "production") ? process.env.PORT || 8000 : 8000;
+const PORT = (process.env.NODE_ENV === "production") ? process.env.PORT || 8080 : 8080;
 app.listen(PORT, () =>
   console.log(`Listening at http://localhost:${PORT}`),
 );

@@ -18,16 +18,15 @@ function getNewID() {
 
 /// get game
 export async function get(id: string, token: string): Promise<string|null> {
-    try {
-        const game = await getGame(dbclient, tableName, id);
-        if (game?.player_tokens?.M?.w?.S === undefined || game?.player_tokens?.M?.b?.S === undefined) {
-            return "invalid";
-        }
+    if (!id || !token)
+        throw Error("Invalid parameters");
 
-        return assignPlayerID(id, token, game);
-    } catch {
+    const game = await getGame(dbclient, tableName, id);
+    if (game?.player_tokens?.M?.w?.S === undefined || game?.player_tokens?.M?.b?.S === undefined) {
         return "invalid";
     }
+
+    return assignPlayerID(id, token, game);
 }
 
 async function assignPlayerID(id: string, token: string, game: {[key: string]: AttributeValue} | undefined) {
@@ -65,8 +64,10 @@ async function assignPlayerID(id: string, token: string, game: {[key: string]: A
 
 /// create game
 export async function create(time: number, increment: number, timer_enabled: boolean, black: string|null=null, white: string|null=null) {
+    if (time === undefined || increment === undefined || timer_enabled === undefined)
+        throw Error("Invalid parameters");
     const id = getNewID();
-    await makeMatch(id, time, increment, timer_enabled, black || "", white || "");
+    await makeMatch(id, time, increment, timer_enabled, white || "", black || "");
     return id;
 }
 
@@ -158,6 +159,9 @@ interface Player {
 let queue = new Heap((a: Player, b: Player) => b.time - a.time);
 
 export async function join(token: string, res: Response<any, Record<string, any>, number>) {
+    if (token === undefined)
+        throw Error("Invalid parameters");
+
     const player: Player = {time: Date.now(), token: token, res: res};
     queue.push(player);
     console.log('queue length: ' + queue.size());
