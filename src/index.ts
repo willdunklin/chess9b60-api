@@ -25,7 +25,6 @@ app.post('/create', (req, res) => {
 });
 
 app.post('/pool', (req, res) => {
-  console.log('pool', req.body);
   join(req.body.token, res)
     .catch(err => error(res, err.message));
 });

@@ -7,7 +7,7 @@ export async function getGame(client: DynamoDBClient, table: string, id: string)
     if (id.length !== 6)
         throw Error("invalid id formatting")
 
-    console.log(id, table)
+    // console.log(id, table)
     const results = await client.send(new GetItemCommand({
         TableName: table,
         Key: {

@@ -164,12 +164,12 @@ export async function join(token: string, res: Response<any, Record<string, any>
 
     const player: Player = {time: Date.now(), token: token, res: res};
     queue.push(player);
-    console.log('queue length: ' + queue.size());
-    console.log('queue: ' + queue.toArray().map((p: Player) => p.token));
+    // console.log('queue length: ' + queue.size());
+    // console.log('queue: ' + queue.toArray().map((p: Player) => p.token));
 
     await populate();
-    console.log('queue length post populate: ' + queue.size());
-    console.log();
+    // console.log('queue length post populate: ' + queue.size());
+    // console.log();
 }
 
 async function populate() {
