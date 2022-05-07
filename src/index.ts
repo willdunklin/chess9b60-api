@@ -1,4 +1,4 @@
-import { create, get, join } from './api';
+import { create, get, join, queue_query } from './api';
 import express from 'express';
 import cors from 'cors';
 import { Response } from 'express-serve-static-core';
@@ -29,6 +29,14 @@ app.post('/create', (req, res) => {
 
 app.post('/pool', (req, res) => {
   join(req.body.token, res)
+    .catch(err => error(res, err.message));
+});
+
+app.post('/queue', (req, res) => {
+  queue_query()
+    .then(result => {
+      res.send(JSON.stringify(result))
+    })
     .catch(err => error(res, err.message));
 });
 

@@ -40,7 +40,7 @@ async function assignPlayerID(id: string, token: string, game: {[key: string]: A
         return "0";
     if(black === token)
         return "1";
-    
+
     // if both players are taken, return null
     if(white !== "" && black !== "")
         return null;
@@ -91,7 +91,7 @@ async function makeMatch(id: string, start_time: number=900000, increment: numbe
         "wTime": start_time,
         "bTime": start_time,
         "increment": increment,
-        "last_event": Date.now()        
+        "last_event": Date.now()
     }
     const ctx = {
         "numPlayers": 2,
@@ -190,5 +190,11 @@ async function populate() {
         queue.push(white);
     if (black)
         queue.push(black);
+}
+///
+
+/// joining pool
+export async function queue_query() {
+    return queue.size();
 }
 ///

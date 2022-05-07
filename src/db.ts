@@ -21,7 +21,7 @@ export async function getGame(client: DynamoDBClient, table: string, id: string)
 
 export async function updatePlayer(client: DynamoDBClient, table: string, id: string, token: string, isBlack: boolean) {
     const game = await getGame(client, table, id);
-    
+
     // get the current player if it exists
     const player = isBlack ? game?.player_tokens?.M?.b?.S : game?.player_tokens?.M?.w?.S;
     if (player)
@@ -29,8 +29,8 @@ export async function updatePlayer(client: DynamoDBClient, table: string, id: st
 
     await client.send(new UpdateItemCommand({
         TableName: table,
-        Key: { 
-            "id": {S: id} 
+        Key: {
+            "id": {S: id}
         },
         ExpressionAttributeValues:{
             ":t": {S: token}
