@@ -177,7 +177,7 @@ async function populate() {
     let black: Player = queue.pop();
 
     if (white && black) {
-        const id = await create(90000, 10000, true, black.token, white.token);
+        const id = await create(600000, 10000, true, black.token, white.token);
         // send the players the game id
         white.res.send(id);
         black.res.send(id);
