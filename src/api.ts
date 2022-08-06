@@ -156,31 +156,51 @@ interface Player {
     res: Response<any, Record<string, any>, number>
 }
 
-let queue = new Heap((a: Player, b: Player) => b.time - a.time);
+let queue: Player[] = [];//new Heap((a: Player, b: Player) => b.time - a.time);
+
+export async function unjoin(token: string) {
+    if (token === undefined)
+        throw Error("Invalid parameters");
+
+    if(queue.find(p => p.token === token) !== undefined) {
+        queue = queue.filter(p => p.token !== token);
+    }
+}
 
 export async function join(token: string, res: Response<any, Record<string, any>, number>) {
     if (token === undefined)
         throw Error("Invalid parameters");
 
     const player: Player = {time: Date.now(), token: token, res: res};
+
+    if(queue.find(p => p.token === token) !== undefined) {
+        unjoin(token);
+        return;
+    }
+
     queue.push(player);
-    // console.log('queue length: ' + queue.size());
-    // console.log('queue: ' + queue.toArray().map((p: Player) => p.token));
+    // console.log('queue length: ' + queue.length);
+    // console.log('queue: ' + queue);
 
     await populate();
-    // console.log('queue length post populate: ' + queue.size());
+    // console.log('queue length post populate: ' + queue.length);
     // console.log();
 }
 
 async function populate() {
-    let white: Player = queue.pop();
-    let black: Player = queue.pop();
+    let white: Player | undefined = queue.pop();
+    let black: Player | undefined = queue.pop();
 
     if (white && black) {
+        if (white?.token === black?.token) {
+            queue.push(white);
+            return;
+        }
+
         const id = await create(600000, 10000, true, black.token, white.token);
         // send the players the game id
-        white.res.send(id);
-        black.res.send(id);
+        white.res.send({'id': id});
+        black.res.send({'id': id});
 
         // iterate through the rest of the queue
         populate();
@@ -195,6 +215,6 @@ async function populate() {
 
 /// joining pool
 export async function queue_query() {
-    return queue.size();
+    return queue.length;
 }
 ///
