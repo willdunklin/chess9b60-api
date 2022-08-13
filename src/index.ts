@@ -37,7 +37,7 @@ app.post('/game', (req, res) => {
 });
 
 app.post('/create', (req, res) => {
-  create(req.body.time, req.body.increment, req.body.timer, req.body.black, req.body.white)
+  create(req.body.time, req.body.increment, req.body.timer, [req.body.lower_strength, req.body.upper_strength], req.body.black, req.body.white)
     .then(result => {
       res.send(JSON.stringify(result))
     })

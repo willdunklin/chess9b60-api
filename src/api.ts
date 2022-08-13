@@ -63,16 +63,16 @@ async function assignPlayerID(id: string, token: string, game: {[key: string]: A
 ///
 
 /// create game
-export async function create(time: number, increment: number, timer_enabled: boolean, black: string|null=null, white: string|null=null) {
+export async function create(time: number, increment: number, timer_enabled: boolean, strength: number[], black: string|null=null, white: string|null=null) {
     if (time === undefined || increment === undefined || timer_enabled === undefined)
         throw Error("Invalid parameters");
     const id = getNewID();
-    await makeMatch(id, time, increment, timer_enabled, white || "", black || "");
+    await makeMatch(id, time, increment, timer_enabled, strength, white || "", black || "");
     return id;
 }
 
-async function makeMatch(id: string, start_time: number=900000, increment: number=10000, timer_enabled: boolean=true, black: string="", white: string="") {
-    const board = initialBoard();
+async function makeMatch(id: string, start_time: number=900000, increment: number=10000, timer_enabled: boolean=true, strength: number[]=[3000,4000], black: string="", white: string="") {
+    const board = initialBoard(strength[0], strength[1]);
 
     const G = {
         "history": [board],
@@ -197,7 +197,7 @@ async function populate() {
             return;
         }
 
-        const id = await create(600000, 10000, true, black.token, white.token);
+        const id = await create(600000, 10000, true, [3000,4000], black.token, white.token);
         // send the players the game id
         white.res.send({'id': id});
         black.res.send({'id': id});
