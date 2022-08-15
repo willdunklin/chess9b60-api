@@ -54,7 +54,7 @@ app.post('/depool', (req, res) => {
     .catch(err => error(res, err.message));
 });
 
-app.post('/queue', (req, res) => {
+app.post('/queue', (_req, res) => {
   queue_query()
     .then(result => {
       res.send(JSON.stringify(result))
