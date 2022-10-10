@@ -156,15 +156,17 @@ interface Player {
     res: Response<any, Record<string, any>, number>
 }
 
-let queue: Player[] = [];//new Heap((a: Player, b: Player) => b.time - a.time);
+export let queue: Player[] = [];
 
 export async function unjoin(token: string) {
     if (token === undefined)
         throw Error("Invalid parameters");
 
-    if(queue.find(p => p.token === token) !== undefined) {
+    const player = queue.find(p => p.token === token);
+    if (player !== undefined) {
         queue = queue.filter(p => p.token !== token);
     }
+    return player;
 }
 
 export async function join(token: string, res: Response<any, Record<string, any>, number>) {
@@ -173,18 +175,17 @@ export async function join(token: string, res: Response<any, Record<string, any>
 
     const player: Player = {time: Date.now(), token: token, res: res};
 
+    // Refresh player if they are already in the queue
     if(queue.find(p => p.token === token) !== undefined) {
-        unjoin(token);
-        return;
+        unjoin(token)
+            .then( old_player => {
+                if (old_player?.res)
+                    old_player.res.send({ id: "unjoined" });
+            })
+            .catch(err => console.log(err));
     }
-
     queue.push(player);
-    // console.log('queue length: ' + queue.length);
-    // console.log('queue: ' + queue);
-
     await populate();
-    // console.log('queue length post populate: ' + queue.length);
-    // console.log();
 }
 
 async function populate() {
@@ -210,11 +211,5 @@ async function populate() {
         queue.push(white);
     if (black)
         queue.push(black);
-}
-///
-
-/// joining pool
-export async function queue_query() {
-    return queue.length;
 }
 ///

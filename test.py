@@ -1,7 +1,7 @@
 import requests
 
-# url = 'http://localhost:8080'
-url = 'https://chess9b60-api.herokuapp.com'
+url = 'http://localhost:8080'
+# url = 'https://chess9b60-api.herokuapp.com'
 
 # res = requests.post(f'{url}/game', data={'id': 'y1gDk4'})
 # print(res, res.text)
@@ -26,8 +26,8 @@ url = 'https://chess9b60-api.herokuapp.com'
 # res = requests.post(f'{url}/pool', data={})
 # print(res, res.text)
 
-# res = requests.post(f'{url}/pool', data={'token': 'thisisatest'})
-# print(res, res.text)
+res = requests.post(f'{url}/pool', data={'token': 'thisisatest'})
+print(res, res.text)
 
 ##############################################################################################
 url = 'https://chess9b60-api.herokuapp.com'
