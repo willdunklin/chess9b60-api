@@ -6,7 +6,6 @@ import { Response } from 'express-serve-static-core';
 
 const { PieceTypes } = require("../chess9b60/src/bgio/pieces");
 const { initialBoard } = require("../chess9b60/src/bgio/logic");
-const Heap = require('heap');
 
 const dbclient = new DynamoDBClient({ region: 'us-east-2', credentials: creds});
 const tableName = "bgio";
@@ -156,60 +155,71 @@ interface Player {
     res: Response<any, Record<string, any>, number>
 }
 
-export let queue: Player[] = [];
+export let queues: Player[][] = [[],[],[]];
 
-export async function unjoin(token: string) {
+export async function unjoin(token: string, message: string, range: [number, number]) {
     if (token === undefined)
         throw Error("Invalid parameters");
 
-    const player = queue.find(p => p.token === token);
-    if (player !== undefined) {
-        queue = queue.filter(p => p.token !== token);
+    for (let i = range[0]; i < range[1]; i++) {
+        const queue = queues[i];
+        const player = queue.find(p => p.token === token);
+
+        if (player !== undefined) {
+            queues[i] = queue.filter(p => p.token !== token);
+            if (message !== null)
+                player.res.send({ id: message });
+        }
     }
-    return player;
 }
 
-export async function join(token: string, res: Response<any, Record<string, any>, number>) {
-    if (token === undefined)
+export async function join(token: string, q_id: number, res: Response<any, Record<string, any>, number>) {
+    if (token === undefined || q_id === undefined)
         throw Error("Invalid parameters");
 
     const player: Player = {time: Date.now(), token: token, res: res};
 
     // Refresh player if they are already in the queue
-    if(queue.find(p => p.token === token) !== undefined) {
-        unjoin(token)
-            .then( old_player => {
-                if (old_player?.res)
-                    old_player.res.send({ id: "unjoined" });
-            })
-            .catch(err => console.log(err));
-    }
-    queue.push(player);
-    await populate();
+    unjoin(token, 'unjoined', [0, queues.length])
+        .catch(err => console.log(err));
+
+    queues[q_id].push(player);
+    await populate(q_id);
 }
 
-async function populate() {
-    let white: Player | undefined = queue.pop();
-    let black: Player | undefined = queue.pop();
+// Time controls
+const tc = [{base: 3  * 60 * 1000, inc: 2  * 1000},  // 3|2
+            {base: 5  * 60 * 1000, inc: 3  * 1000},  // 5|3
+            {base: 10 * 60 * 1000, inc: 10 * 1000}]; // 10|10
+
+async function populate(q_id: number) {
+    let white: Player | undefined = queues[q_id].pop();
+    let black: Player | undefined = queues[q_id].pop();
+
+    // Ensure no duplicate players
+    if (white === black && white !== undefined) {
+        queues[q_id].push(white);
+        return;
+    }
 
     if (white && black) {
         if (white?.token === black?.token) {
-            queue.push(white);
+            queues[q_id].push(white);
             return;
         }
 
-        const id = await create(600000, 10000, true, [3000,4000], black.token, white.token);
+        const id = await create(tc[q_id].base, tc[q_id].inc, true, [3000,4000], black.token, white.token);
         // send the players the game id
         white.res.send({'id': id});
         black.res.send({'id': id});
 
         // iterate through the rest of the queue
-        populate();
+        populate(q_id);
         return;
     }
     if (white)
-        queue.push(white);
+        queues[q_id].push(white);
     if (black)
-        queue.push(black);
+        queues[q_id].push(black);
 }
 ///

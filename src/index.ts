@@ -1,4 +1,4 @@
-import { create, get, join, unjoin, queue } from './api';
+import { create, get, join, unjoin, queues } from './api';
 import express from 'express';
 import cors from 'cors';
 import { Response } from 'express-serve-static-core';
@@ -46,13 +46,13 @@ app.post('/create', (req, res) => {
 });
 
 app.post('/pool', (req, res) => {
-  join(req.body.token, res)
+  join(req.body.token, req.body.q_id, res)
     .catch(err => error(res, err.message));
 });
 
 app.get('/queue', (_req, res) => {
   // console.log('/q', queue.length);
-  res.json(queue.length);
+  res.json(queues.map(q => q.length));
 });
 
 //--------------------------------------------------------
@@ -62,20 +62,21 @@ app.listen(PORT, () =>
 );
 
 // # of milliseconds before someone is removed from the queue
-const QUEUE_TIMEOUT = 10 * 1000; // 10s
+const QUEUE_TIMEOUT = 6 * 1000; // 6s
 
 const checkTimeout = () => {
   const now = Date.now();
-  for (const player of queue) {
-    // console.log(player.token, now - player.time, queue.length);
+  // In each queue check for timed out players
+  queues.forEach((queue, i) => {
+    for (const player of queue) {
+      console.log(player.token, now - player.time, queue.length);
 
-    // Remove old players from the queue
-    if (now - player.time >= QUEUE_TIMEOUT) {
-      player.res.send({ 'id': 'timeout' });
-      unjoin(player.token);
+      // Remove old players from the queue
+      if (now - player.time >= QUEUE_TIMEOUT)
+        unjoin(player.token, 'timeout', [i, i + 1]);
     }
-  }
+  });
 }
 
 // Check queue for timeouts every 1/2 second
-setInterval(checkTimeout, 500);
+setInterval(checkTimeout, 100);
