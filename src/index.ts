@@ -1,4 +1,4 @@
-import { create, get, join, unjoin, queues } from './api';
+import { create, get, join, unjoin, variant, queues, synthesize_game } from './api';
 import express from 'express';
 import cors from 'cors';
 import { Response } from 'express-serve-static-core';
@@ -40,9 +40,13 @@ app.post('/game', (req, res) => {
 });
 
 app.post('/create', (req, res) => {
-  create(req.body.time, req.body.increment, req.body.timer, [req.body.lower_strength, req.body.upper_strength], req.body.black, req.body.white)
-    .then(result => res.json(result))
-    .catch(err => error(res, err.message));
+  try {
+    create(req.body.time, req.body.increment, req.body.timer, [req.body.lower_strength, req.body.upper_strength], req.body.black, req.body.white)
+      .then(result => res.json(result))
+      .catch(err => error(res, err.message));
+  } catch (e) {
+    error(res, 'Issue creating game');
+  }
 });
 
 app.post('/pool', (req, res) => {
@@ -53,6 +57,30 @@ app.post('/pool', (req, res) => {
 app.get('/queue', (_req, res) => {
   // console.log('/q', queue.length);
   res.json(queues.map(q => q.length));
+});
+
+app.get('/variant/:id/start', (req, res) => {
+  // console.log(req.params.id, req.params.start);
+  variant(req.params.id, true)
+    .then(result => res.json(result))
+    .catch(err => error(res, err.message));
+});
+
+app.get('/variant/:id', (req, res) => {
+  // console.log(req.params.id, req.params.start);
+  variant(req.params.id, false)
+    .then(result => res.json(result))
+    .catch(err => error(res, err.message));
+});
+
+app.post('/synthesize/:id', (req, res) => {
+  try {
+    synthesize_game(req.params.id, JSON.parse(req.body.moves))
+      .then(result => res.send(result))
+      .catch(err => error(res, err.message));
+  } catch (e) {
+    error(res, 'Could not parse moves');
+  }
 });
 
 //--------------------------------------------------------
