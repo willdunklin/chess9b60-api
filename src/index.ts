@@ -1,4 +1,4 @@
-import { create, get, join, unjoin, variant, queues, synthesize_game } from './api';
+import { login, create, get, join, unjoin, variant, queues, synthesize_game } from './api';
 import express from 'express';
 import cors from 'cors';
 import { Response } from 'express-serve-static-core';
@@ -23,7 +23,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const error = (res: Response<any, Record<string, any>, number>, err: string) => {
-    console.error(err);
+    console.error('error:', err);
     res.status(500).send('Internal server error');
 }
 
@@ -81,6 +81,12 @@ app.post('/synthesize/:id', (req, res) => {
   } catch (e) {
     error(res, 'Could not parse moves');
   }
+});
+
+app.post('/auth/google', (req, res) => {
+  login(req.body.token)
+    .then(result => res.json(result))
+    .catch(err => error(res, err));
 });
 
 //--------------------------------------------------------

@@ -1,21 +1,87 @@
 import { getGame, updatePlayer } from "./db";
-import { DynamoDBClient, PutItemCommand, AttributeValue } from "@aws-sdk/client-dynamodb";
+import { DynamoDBClient, GetItemCommand, PutItemCommand, AttributeValue } from "@aws-sdk/client-dynamodb";
 import { nanoid } from 'nanoid';
-import { creds } from "./creds";
+import { creds, google } from "./creds";
 import { Response } from 'express-serve-static-core';
 
 import { PieceTypes } from "../chess9b60/src/bgio/pieces";
 const { initialBoard } = require("../chess9b60/src/bgio/logic");
 const { DynamnoStore } = require("../chess9b60/src/bgio/db");
+import { OAuth2Client } from 'google-auth-library';
 
-const dbclient = new DynamoDBClient({ region: 'us-east-2', credentials: creds});
-const bgio_db = new DynamnoStore("us-east-2", creds, "bgio");
+const google_client_id = google().client_id;
+const google_client = new OAuth2Client(google_client_id);
+
+const dbclient = new DynamoDBClient({ region: 'us-east-2', credentials: creds() });
+const bgio_db = new DynamnoStore("us-east-2", creds(), "bgio");
 const tableName = "bgio";
 
 function getNewID() {
     const str = nanoid().replace(/[^a-zA-Z0-9]/g, 'w');
     return str.substring(0, 6);
 }
+
+///
+interface User {
+    id: string;
+    username: string;
+    email: string;
+    elo: number;
+    games: {id: string, color: string, result: string}[];
+    blurb: string;
+};
+
+const db2user = (item: {[key: string]: AttributeValue}): User => {
+    if (item.id.S === undefined || item.username.S === undefined || item.email.S === undefined ||
+        item.elo.N === undefined || item.games.L === undefined || item.blurb.S === undefined)
+            throw new Error("Invalid user");
+
+    return {
+        id: item.id.S!,
+        username: item.username.S!,
+        email: item.email.S!,
+        elo: parseInt(item.elo.N!),
+        games: item.games.L!.map((v: AttributeValue, index: number, array: AttributeValue[]) => {
+            const g = v.M!;
+            return {
+                id: g.id.S!,
+                color: g.color.S!,
+                result: g.result.S!,
+            }
+        }),
+        blurb: item.blurb.S!
+    }
+}
+
+export const login = async (token: string) => {
+    if (!token)
+        throw new Error('No token');
+
+    const ticket = await google_client.verifyIdToken({
+        idToken: token,
+        audience: google_client_id
+    });
+
+    const payload = ticket.getPayload();
+    console.log(payload);
+
+    if (!payload || !payload.email)
+        throw new Error('No ticket payload');
+
+    const email = payload.email;
+    const res = await dbclient.send(new GetItemCommand({
+        TableName: "users",
+        Key: {
+            "email": {S: email}
+        }
+    }));
+    console.log('item', res.Item);
+    if (res.Item === undefined)
+        return { id: '', email: email };
+
+    return db2user(res.Item);
+}
+///
 
 /// get game
 export async function get(id: string, token: string): Promise<string|null> {
