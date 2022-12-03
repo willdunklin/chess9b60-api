@@ -1,21 +1,182 @@
 import { getGame, updatePlayer } from "./db";
-import { DynamoDBClient, PutItemCommand, AttributeValue } from "@aws-sdk/client-dynamodb";
+import { DynamoDBClient, GetItemCommand, UpdateItemCommand, PutItemCommand, ScanCommand, AttributeValue } from "@aws-sdk/client-dynamodb";
 import { nanoid } from 'nanoid';
-import { creds } from "./creds";
+import { creds, google } from "./creds";
 import { Response } from 'express-serve-static-core';
 
 import { PieceTypes } from "../chess9b60/src/bgio/pieces";
 const { initialBoard } = require("../chess9b60/src/bgio/logic");
 const { DynamnoStore } = require("../chess9b60/src/bgio/db");
+import { OAuth2Client } from 'google-auth-library';
 
-const dbclient = new DynamoDBClient({ region: 'us-east-2', credentials: creds});
-const bgio_db = new DynamnoStore("us-east-2", creds, "bgio");
+const google_client_id = google().client_id;
+const google_client = new OAuth2Client(google_client_id);
+
+const dbclient = new DynamoDBClient({ region: 'us-east-2', credentials: creds() });
+const bgio_db = new DynamnoStore("us-east-2", creds(), "bgio");
 const tableName = "bgio";
 
 function getNewID() {
     const str = nanoid().replace(/[^a-zA-Z0-9]/g, 'w');
     return str.substring(0, 6);
 }
+
+///
+interface User {
+    id: string;
+    token: string;
+    username: string;
+    email: string;
+    elo: number;
+    games: {id: string, color: string, result: string}[];
+    blurb: string;
+};
+
+const db2user = (item: {[key: string]: AttributeValue}, token?: string): User => {
+    if (item.id.S === undefined || item.username.S === undefined || item.email.S === undefined ||
+        item.elo.N === undefined || item.games.L === undefined || item.blurb.S === undefined)
+            throw new Error("Invalid user");
+
+    if (token === undefined && item.token.S === undefined)
+        throw new Error("Invalid user: No token provided");
+
+    return {
+        id: item.id.S,
+        username: item.username.S,
+        email: item.email.S,
+        elo: parseInt(item.elo.N),
+        games: item.games.L.map((v: AttributeValue, index: number, array: AttributeValue[]) => {
+            const g = v.M!;
+            return {
+                id: g.id.S!,
+                color: g.color.S!,
+                result: g.result.S!,
+            }
+        }),
+        blurb: item.blurb.S,
+        token: token || item.token.S!
+    }
+}
+
+export const login = async (token: string) => {
+    if (!token)
+        throw new Error('No token');
+
+    const ticket = await google_client.verifyIdToken({
+        idToken: token,
+        audience: google_client_id
+    });
+
+    const payload = ticket.getPayload();
+    if (!payload || !payload.email || !payload.at_hash)
+        throw new Error('No ticket payload');
+
+    const email = payload.email;
+    const res = await dbclient.send(new GetItemCommand({
+        TableName: "users",
+        Key: {
+            "email": {S: email}
+        }
+    }));
+
+    if (res.Item === undefined)
+        return { token: '' }; // no user found
+
+    await dbclient.send(new UpdateItemCommand({
+        TableName: "users",
+        Key: {
+            "email": {S: email}
+        },
+        UpdateExpression: "set #token=:token",
+        ExpressionAttributeValues: {
+            ":token": {S: payload.at_hash},
+        },
+        ExpressionAttributeNames: {
+            "#token": "token",
+        },
+    }));
+
+    return db2user(res.Item, payload.at_hash);
+}
+
+export const getUser = async (email: string, token: string) => {
+    if (!email || !token)
+        throw new Error('No email or token');
+
+    const res = await dbclient.send(new GetItemCommand({
+        TableName: "users",
+        Key: {
+            "email": {S: email}
+        }
+    }));
+
+    if (res.Item === undefined)
+        throw new Error('No user');
+
+    if (res.Item.token.S !== token)
+        return { token: '' };
+
+    return db2user(res.Item);
+}
+
+export const createUser = async (token: string, username: string) => {
+    if (!token)
+        throw new Error('No token');
+
+    if (username.length < 3 || username.length > 20)
+        return { error: 'Invalid username' };
+
+    if (!/^\w+$/.test(username))
+        return { error: 'Invalid username' };
+
+    const ticket = await google_client.verifyIdToken({
+        idToken: token,
+        audience: google_client_id
+    });
+    const payload = ticket.getPayload();
+    if (!payload || !payload.email || !payload.at_hash)
+        throw new Error('No ticket payload');
+
+    const res = await dbclient.send(new GetItemCommand({
+        TableName: "users",
+        Key: {
+            "email": {S: payload.email}
+        }
+    }));
+
+    if (res.Item !== undefined)
+        return { error: 'User already exists' };
+
+    const results = await dbclient.send(new ScanCommand({
+        TableName: "users",
+        FilterExpression: "username = :username",
+        ExpressionAttributeValues: {
+            ":username": {S: username}
+        }
+    }));
+
+    if (results.Count !== 0)
+        return { error: 'Username already exists' };
+
+    const item = {
+        "email": {S: payload.email},
+        "id": {S: nanoid()},
+        "username": {S: username},
+        "elo": {N: "1000"},
+        "games": {L: []},
+        "blurb": {S: ""},
+        "token": {S: payload.at_hash},
+    }
+
+    await dbclient.send(new PutItemCommand({
+        TableName: "users",
+        Item: item,
+    }));
+
+    // console.log(db2user(item));
+    return db2user(item);
+}
+///
 
 /// get game
 export async function get(id: string, token: string): Promise<string|null> {
@@ -235,7 +396,6 @@ export const variant = async (id: string, start_pos: boolean) => {
     variant += prom_pieces + '\n';
     variant += `startFen = ${fen}\n`;
 
-    // console.log('new_game', await synthesize_game(id, ['f8e6']));
     if (state.G.move_history[0]) {
         const last_move = state.G.move_history[0].map((m: string) => m.split('@')[1]).join('');
         return { turn: turn, name: `!${id}#${turn}`, filename: `${id}#${turn}.ini`, content: variant, last_move: last_move };
@@ -269,7 +429,6 @@ export const synthesize_game = async (id: string, moves: string[]) => {
             continue;
         piece_map_inv[value.toLowerCase()] = key;
     }
-    // console.log(piece_map_inv);
 
     let whiteTurn: boolean = G.whiteTurn;
     let move_history: string[][] = G.move_history;

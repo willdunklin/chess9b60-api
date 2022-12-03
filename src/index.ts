@@ -1,3 +1,4 @@
+import { login, getUser, createUser } from './api';
 import { create, get, join, unjoin, variant, queues, synthesize_game } from './api';
 import express from 'express';
 import cors from 'cors';
@@ -23,7 +24,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const error = (res: Response<any, Record<string, any>, number>, err: string) => {
-    console.error(err);
+    console.error('error:', err);
     res.status(500).send('Internal server error');
 }
 
@@ -40,13 +41,9 @@ app.post('/game', (req, res) => {
 });
 
 app.post('/create', (req, res) => {
-  try {
-    create(req.body.time, req.body.increment, req.body.timer, [req.body.lower_strength, req.body.upper_strength], req.body.black, req.body.white)
-      .then(result => res.json(result))
-      .catch(err => error(res, err.message));
-  } catch (e) {
-    error(res, 'Issue creating game');
-  }
+  create(req.body.time, req.body.increment, req.body.timer, [req.body.lower_strength, req.body.upper_strength], req.body.black, req.body.white)
+    .then(result => res.json(result))
+    .catch(err => error(res, err.message));
 });
 
 app.post('/pool', (req, res) => {
@@ -81,6 +78,24 @@ app.post('/synthesize/:id', (req, res) => {
   } catch (e) {
     error(res, 'Could not parse moves');
   }
+});
+
+app.post('/auth/google', (req, res) => {
+  login(req.body.token)
+    .then(result => res.json(result))
+    .catch(err => error(res, err));
+});
+
+app.post('/auth/user', (req, res) => {
+  getUser(req.body.email, req.body.token)
+    .then(result => res.json(result))
+    .catch(err => error(res, err));
+});
+
+app.post('/auth/create', (req, res) => {
+  createUser(req.body.token, req.body.username)
+    .then(result => res.json(result))
+    .catch(err => error(res, err));
 });
 
 //--------------------------------------------------------

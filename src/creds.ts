@@ -1,9 +1,16 @@
-import { Credentials } from "@aws-sdk/types";
+import * as dotenv from 'dotenv';
 
-const access = process.env.NODE_ENV === "production" ? process.env.REACT_APP_AWS_KEY_ID : require('./secret').accessKey;
-const secret = process.env.NODE_ENV === "production" ? process.env.REACT_APP_AWS_SECRET_KEY : require('./secret').secretKey;
+export const creds = () => {
+    if (process.env.NODE_ENV === "production") {
+        return { accessKeyId:     process.env.REACT_APP_AWS_KEY_ID || 'invalid',
+                 secretAccessKey: process.env.REACT_APP_AWS_SECRET_KEY || 'invalid' };
+    }
+    dotenv.config();
+    return { accessKeyId:     process.env.AWS_KEY_ID || 'invalid',
+             secretAccessKey: process.env.AWS_SECRET_KEY || 'invalid' };
+};
 
-export const creds: Credentials = {
-    accessKeyId: access || "invalid",
-    secretAccessKey: secret || "invalid"
+export const google = () => {
+    dotenv.config();
+    return { client_id: process.env.VITE_GOOGLE_LOGIN || 'invalid' }
 }
