@@ -1,4 +1,5 @@
-import { login, create, get, join, unjoin, variant, queues, synthesize_game } from './api';
+import { login, getUser, createUser } from './api';
+import { create, get, join, unjoin, variant, queues, synthesize_game } from './api';
 import express from 'express';
 import cors from 'cors';
 import { Response } from 'express-serve-static-core';
@@ -85,6 +86,18 @@ app.post('/synthesize/:id', (req, res) => {
 
 app.post('/auth/google', (req, res) => {
   login(req.body.token)
+    .then(result => res.json(result))
+    .catch(err => error(res, err));
+});
+
+app.post('/auth/user', (req, res) => {
+  getUser(req.body.email, req.body.token)
+    .then(result => res.json(result))
+    .catch(err => error(res, err));
+});
+
+app.post('/auth/create', (req, res) => {
+  createUser(req.body.token, req.body.username)
     .then(result => res.json(result))
     .catch(err => error(res, err));
 });

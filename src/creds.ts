@@ -12,5 +12,5 @@ export const creds = () => {
 
 export const google = () => {
     dotenv.config();
-    return { client_id: process.env.REACT_APP_GOOGLE_LOGIN || 'invalid' }
+    return { client_id: process.env.VITE_GOOGLE_LOGIN || 'invalid' }
 }

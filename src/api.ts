@@ -1,5 +1,5 @@
 import { getGame, updatePlayer } from "./db";
-import { DynamoDBClient, GetItemCommand, PutItemCommand, AttributeValue } from "@aws-sdk/client-dynamodb";
+import { DynamoDBClient, GetItemCommand, UpdateItemCommand, PutItemCommand, ScanCommand, AttributeValue } from "@aws-sdk/client-dynamodb";
 import { nanoid } from 'nanoid';
 import { creds, google } from "./creds";
 import { Response } from 'express-serve-static-core';
@@ -24,6 +24,7 @@ function getNewID() {
 ///
 interface User {
     id: string;
+    token: string;
     username: string;
     email: string;
     elo: number;
@@ -31,10 +32,13 @@ interface User {
     blurb: string;
 };
 
-const db2user = (item: {[key: string]: AttributeValue}): User => {
+const db2user = (item: {[key: string]: AttributeValue}, token?: string): User => {
     if (item.id.S === undefined || item.username.S === undefined || item.email.S === undefined ||
         item.elo.N === undefined || item.games.L === undefined || item.blurb.S === undefined)
             throw new Error("Invalid user");
+
+    if (token === undefined && item.token.S === undefined)
+        throw new Error("Invalid user: No token provided");
 
     return {
         id: item.id.S!,
@@ -49,7 +53,8 @@ const db2user = (item: {[key: string]: AttributeValue}): User => {
                 result: g.result.S!,
             }
         }),
-        blurb: item.blurb.S!
+        blurb: item.blurb.S!,
+        token: token || item.token.S!
     }
 }
 
@@ -63,9 +68,7 @@ export const login = async (token: string) => {
     });
 
     const payload = ticket.getPayload();
-    console.log(payload);
-
-    if (!payload || !payload.email)
+    if (!payload || !payload.email || !payload.at_hash)
         throw new Error('No ticket payload');
 
     const email = payload.email;
@@ -75,11 +78,103 @@ export const login = async (token: string) => {
             "email": {S: email}
         }
     }));
-    console.log('item', res.Item);
+
     if (res.Item === undefined)
-        return { id: '', email: email };
+        return { token: '' }; // no user found
+
+    await dbclient.send(new UpdateItemCommand({
+        TableName: "users",
+        Key: {
+            "email": {S: email}
+        },
+        UpdateExpression: "set #token=:token",
+        ExpressionAttributeValues: {
+            ":token": {S: payload.at_hash},
+        },
+        ExpressionAttributeNames: {
+            "#token": "token",
+        },
+    }));
+
+    return db2user(res.Item, payload.at_hash);
+}
+
+export const getUser = async (email: string, token: string) => {
+    if (!email || !token)
+        throw new Error('No email or token');
+
+    const res = await dbclient.send(new GetItemCommand({
+        TableName: "users",
+        Key: {
+            "email": {S: email}
+        }
+    }));
+
+    if (res.Item === undefined)
+        throw new Error('No user');
+
+    if (res.Item.token.S !== token)
+        return { token: '' };
 
     return db2user(res.Item);
+}
+
+export const createUser = async (token: string, username: string) => {
+    if (!token)
+        throw new Error('No token');
+
+    if (username.length < 3 || username.length > 20)
+        return { error: 'Invalid username' };
+
+    if (!/^[a-zA-Z0-9_]+$/.test(username))
+        return { error: 'Invalid username' };
+
+    const ticket = await google_client.verifyIdToken({
+        idToken: token,
+        audience: google_client_id
+    });
+    const payload = ticket.getPayload();
+    if (!payload || !payload.email || !payload.at_hash)
+        throw new Error('No ticket payload');
+
+    const res = await dbclient.send(new GetItemCommand({
+        TableName: "users",
+        Key: {
+            "email": {S: payload.email}
+        }
+    }));
+
+    if (res.Item !== undefined)
+        return { error: 'User already exists' };
+
+    const results = await dbclient.send(new ScanCommand({
+        TableName: "users",
+        FilterExpression: "username = :username",
+        ExpressionAttributeValues: {
+            ":username": {S: username}
+        }
+    }));
+
+    if (results.Count !== 0)
+        return { error: 'Username already exists' };
+
+    const item = {
+        "email": {S: payload.email},
+        "id": {S: nanoid()},
+        "username": {S: username},
+        "elo": {N: "1000"},
+        "games": {L: []},
+        "blurb": {S: ""},
+        "token": {S: payload.at_hash},
+    }
+
+    await dbclient.send(new PutItemCommand({
+        TableName: "users",
+        Item: item,
+    }));
+
+    console.log(db2user(item));
+    return db2user(item);
 }
 ///
 
