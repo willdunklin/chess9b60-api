@@ -41,11 +41,11 @@ const db2user = (item: {[key: string]: AttributeValue}, token?: string): User =>
         throw new Error("Invalid user: No token provided");
 
     return {
-        id: item.id.S!,
-        username: item.username.S!,
-        email: item.email.S!,
-        elo: parseInt(item.elo.N!),
-        games: item.games.L!.map((v: AttributeValue, index: number, array: AttributeValue[]) => {
+        id: item.id.S,
+        username: item.username.S,
+        email: item.email.S,
+        elo: parseInt(item.elo.N),
+        games: item.games.L.map((v: AttributeValue, index: number, array: AttributeValue[]) => {
             const g = v.M!;
             return {
                 id: g.id.S!,
@@ -53,7 +53,7 @@ const db2user = (item: {[key: string]: AttributeValue}, token?: string): User =>
                 result: g.result.S!,
             }
         }),
-        blurb: item.blurb.S!,
+        blurb: item.blurb.S,
         token: token || item.token.S!
     }
 }
@@ -126,7 +126,7 @@ export const createUser = async (token: string, username: string) => {
     if (username.length < 3 || username.length > 20)
         return { error: 'Invalid username' };
 
-    if (!/^[a-zA-Z0-9_]+$/.test(username))
+    if (!/^\w+$/.test(username))
         return { error: 'Invalid username' };
 
     const ticket = await google_client.verifyIdToken({
@@ -173,7 +173,7 @@ export const createUser = async (token: string, username: string) => {
         Item: item,
     }));
 
-    console.log(db2user(item));
+    // console.log(db2user(item));
     return db2user(item);
 }
 ///
@@ -396,7 +396,6 @@ export const variant = async (id: string, start_pos: boolean) => {
     variant += prom_pieces + '\n';
     variant += `startFen = ${fen}\n`;
 
-    // console.log('new_game', await synthesize_game(id, ['f8e6']));
     if (state.G.move_history[0]) {
         const last_move = state.G.move_history[0].map((m: string) => m.split('@')[1]).join('');
         return { turn: turn, name: `!${id}#${turn}`, filename: `${id}#${turn}.ini`, content: variant, last_move: last_move };
@@ -430,7 +429,6 @@ export const synthesize_game = async (id: string, moves: string[]) => {
             continue;
         piece_map_inv[value.toLowerCase()] = key;
     }
-    // console.log(piece_map_inv);
 
     let whiteTurn: boolean = G.whiteTurn;
     let move_history: string[][] = G.move_history;

@@ -41,13 +41,9 @@ app.post('/game', (req, res) => {
 });
 
 app.post('/create', (req, res) => {
-  try {
-    create(req.body.time, req.body.increment, req.body.timer, [req.body.lower_strength, req.body.upper_strength], req.body.black, req.body.white)
-      .then(result => res.json(result))
-      .catch(err => error(res, err.message));
-  } catch (e) {
-    error(res, 'Issue creating game');
-  }
+  create(req.body.time, req.body.increment, req.body.timer, [req.body.lower_strength, req.body.upper_strength], req.body.black, req.body.white)
+    .then(result => res.json(result))
+    .catch(err => error(res, err.message));
 });
 
 app.post('/pool', (req, res) => {
