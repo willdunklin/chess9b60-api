@@ -56,6 +56,10 @@ app.get('/queue', (_req, res) => {
   res.json(queues.map(q => q.length));
 });
 
+app.post('/end/:id', (req, res) => {
+  console.log(req.params.id);
+});
+
 app.get('/variant/:id/start', (req, res) => {
   // console.log(req.params.id, req.params.start);
   variant(req.params.id, true)

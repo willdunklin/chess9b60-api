@@ -254,6 +254,7 @@ async function makeMatch(id: string, start_time: number=900000, increment: numbe
         "whiteTurn": true,
         "inCheck": "",
         "noProgressCounter": 0,
+        "gameid": id,
         "timer_enabled": timer_enabled,
         "startTime": start_time,
         "wTime": start_time,
