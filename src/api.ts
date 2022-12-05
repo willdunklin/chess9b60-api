@@ -306,6 +306,7 @@ async function makeMatch(id: string, start_time: number=900000, increment: numbe
         state: {S: JSON.stringify(initialState)},
         initialState: {S: JSON.stringify(initialState)},
         log: {S: "[]"},
+        result: {S: ""},
         player_tokens: {M: { "w": {S: black}, "b": {S: white} }}
     }
 
@@ -318,6 +319,93 @@ async function makeMatch(id: string, start_time: number=900000, increment: numbe
 }
 ///
 
+const updatePlayersResult = async (white_id: string, black_id: string, game: string, result: string) => {
+    const white = await dbclient.send(new ScanCommand({
+        TableName: "users",
+        FilterExpression: "id = :id",
+        ExpressionAttributeValues: {
+            ":id": {S: white_id}
+        }
+    }));
+
+    const black = await dbclient.send(new ScanCommand({
+        TableName: "users",
+        FilterExpression: "id = :id",
+        ExpressionAttributeValues: {
+            ":id": {S: black_id}
+        }
+    }));
+
+    if(white.Items === undefined || black.Items === undefined)
+        return;
+
+    const white_user = white.Items[0];
+    const black_user = black.Items[0];
+
+    if(white_user === undefined || black_user === undefined || white_user.elo.N === undefined || black_user.elo.N === undefined)
+        return;
+
+    const w_elo = parseInt(white_user.elo.N);
+    const b_elo = parseInt(black_user.elo.N);
+
+    // TODO: add elo calculation
+    // await dbclient.send(new UpdateItemCommand({
+    //     TableName: "users",
+    //     Key: {
+    //         "id": {S: white_id}
+    //     },
+    //     UpdateExpression: "SET elo = :elo",
+    //     ExpressionAttributeValues: {
+    //         ":elo": {N: w_elo} // TODO: change to updated elo
+    //     }
+    // }));
+
+    // await dbclient.send(new UpdateItemCommand({
+    //     TableName: "users",
+    //     Key: {
+    //         "id": {S: black_id}
+    //     },
+    //     UpdateExpression: "SET elo = :elo",
+    //     ExpressionAttributeValues: {
+    //         ":elo": {N: b_elo} // TODO: change to updated elo
+    //     }
+    // }));
+
+    // TODO: add game to user's game history
+}
+
+export const end = async (id: string) => {
+    const game = await getGame(dbclient, tableName, id);
+    if (!game || !game.player_tokens || !game.player_tokens.M || !game.gameover?.S || game.result === undefined)
+        return;
+
+    const white_id = game.player_tokens.M.w.S;
+    const black_id = game.player_tokens.M.b.S;
+    if(white_id === '' || black_id === '' || white_id === undefined || black_id === undefined)
+        return;
+
+    if(game.result.S !== '')
+        return;
+
+    // check the result of the game
+    const result = game.gameover.S.includes('draw') ? 'd' : game.gameover.S.includes('White') ? 'w' : 'b';
+
+    // update the result
+    await dbclient.send(new UpdateItemCommand({
+        TableName: tableName,
+        Key: { id: {S: id} },
+        UpdateExpression: "set #result=:r",
+        ExpressionAttributeValues: {
+            ":r": {S: result}
+        },
+        ExpressionAttributeNames: {
+            "#result": "result",
+        },
+    }));
+
+    // update the players
+    await updatePlayersResult(white_id, black_id, id, result);
+}
 
 ///
 const board2fen = (board: (string | null)[], piece_map: {[key: string]: string}, white: boolean, turn: number, halfmoves: number) => {

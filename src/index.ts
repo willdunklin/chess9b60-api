@@ -1,5 +1,5 @@
 import { login, getUser, createUser } from './api';
-import { create, get, join, unjoin, variant, queues, synthesize_game } from './api';
+import { create, get, join, unjoin, variant, queues, synthesize_game, end } from './api';
 import express from 'express';
 import cors from 'cors';
 import { Response } from 'express-serve-static-core';
@@ -56,8 +56,10 @@ app.get('/queue', (_req, res) => {
   res.json(queues.map(q => q.length));
 });
 
-app.post('/end/:id', (req, res) => {
-  console.log(req.params.id);
+app.get('/end/:id', (req, res) => {
+  end(req.params.id)
+    .then(result => res.json(result))
+    .catch(err => error(res, err.message));
 });
 
 app.get('/variant/:id/start', (req, res) => {
