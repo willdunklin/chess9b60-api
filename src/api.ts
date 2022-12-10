@@ -3,6 +3,7 @@ import { DynamoDBClient, GetItemCommand, UpdateItemCommand, PutItemCommand, Scan
 import { nanoid } from 'nanoid';
 import { creds, google } from "./creds";
 import { Response } from 'express-serve-static-core';
+import EloRank from 'elo-rank';
 
 import { PieceTypes } from "../chess9b60/src/bgio/pieces";
 const { initialBoard } = require("../chess9b60/src/bgio/logic");
@@ -173,7 +174,6 @@ export const createUser = async (token: string, username: string) => {
         Item: item,
     }));
 
-    // console.log(db2user(item));
     return db2user(item);
 }
 ///
@@ -319,59 +319,12 @@ async function makeMatch(id: string, start_time: number=900000, increment: numbe
 }
 ///
 
-const updatePlayersResult = async (white_id: string, black_id: string, game: string, result: string) => {
-    const white = await dbclient.send(new ScanCommand({
-        TableName: "users",
-        FilterExpression: "id = :id",
-        ExpressionAttributeValues: {
-            ":id": {S: white_id}
-        }
-    }));
-
-    const black = await dbclient.send(new ScanCommand({
-        TableName: "users",
-        FilterExpression: "id = :id",
-        ExpressionAttributeValues: {
-            ":id": {S: black_id}
-        }
-    }));
-
-    if(white.Items === undefined || black.Items === undefined)
-        return;
-
-    const white_user = white.Items[0];
-    const black_user = black.Items[0];
-
-    if(white_user === undefined || black_user === undefined || white_user.elo.N === undefined || black_user.elo.N === undefined)
-        return;
-
-    const w_elo = parseInt(white_user.elo.N);
-    const b_elo = parseInt(black_user.elo.N);
-
-    // TODO: add elo calculation
-    // await dbclient.send(new UpdateItemCommand({
-    //     TableName: "users",
-    //     Key: {
-    //         "id": {S: white_id}
-    //     },
-    //     UpdateExpression: "SET elo = :elo",
-    //     ExpressionAttributeValues: {
-    //         ":elo": {N: w_elo} // TODO: change to updated elo
-    //     }
-    // }));
-
-    // await dbclient.send(new UpdateItemCommand({
-    //     TableName: "users",
-    //     Key: {
-    //         "id": {S: black_id}
-    //     },
-    //     UpdateExpression: "SET elo = :elo",
-    //     ExpressionAttributeValues: {
-    //         ":elo": {N: b_elo} // TODO: change to updated elo
-    //     }
-    // }));
-
-    // TODO: add game to user's game history
+interface GameResult {
+    gameid: string;
+    wasWhite: boolean;
+    w: {r: number};
+    b: {r: number};
+    result: 1 | 0 | 0.5;
 }
 
 export const end = async (id: string) => {
@@ -404,7 +357,64 @@ export const end = async (id: string) => {
     }));
 
     // update the players
-    await updatePlayersResult(white_id, black_id, id, result);
+    await updatePlayerResult(white_id, black_id, id, result);
+}
+
+const updatePlayerResult = async (white_id: string, black_id: string, gameid: string, result: string) => {
+    const white_player = await dbclient.send(new ScanCommand({
+        TableName: "users",
+        FilterExpression: "id = :id",
+        ExpressionAttributeValues: { ":id": {S: white_id} }
+    }));
+
+    const black_player = await dbclient.send(new ScanCommand({
+        TableName: "users",
+        FilterExpression: "id = :id",
+        ExpressionAttributeValues: { ":id": {S: black_id} }
+    }));
+
+    if(white_player.Items === undefined || white_player.Items[0] === undefined ||
+       black_player.Items === undefined || black_player.Items[0] === undefined)
+        return;
+
+    const white_user = white_player.Items[0];
+    const black_user = black_player.Items[0];
+
+    if (white_user.email?.S === undefined || black_user.email?.S === undefined)
+        return;
+
+    const game: GameResult = {
+        gameid: gameid,
+        wasWhite: true,
+        w: {r: parseInt(white_user.elo?.N || '1000')},
+        b: {r: parseInt(black_user.elo?.N || '1000')},
+        result: result === 'w' ? 1 : result === 'b' ? 0 : 0.5
+    };
+
+    await addGame(white_user, game, true);
+    await addGame(black_user, game, false);
+}
+
+const addGame = async (player: {[key: string]: AttributeValue}, game: GameResult, white: boolean) => {
+    if(!player.email?.S)
+        return;
+
+    const games = player.games?.L || [];
+    game.wasWhite = white;
+    games.push({ S: JSON.stringify(game) });
+
+    const rank = new EloRank();
+    const playerA = white ? game.w.r : game.b.r;
+    const playerB = white ? game.b.r : game.w.r;
+    const expected = rank.getExpected(playerA, playerB);
+    const elo = rank.updateRating(expected, white ? game.result : 1 - game.result, playerA);
+
+    await dbclient.send(new UpdateItemCommand({
+        TableName: "users",
+        Key: { email: {S: player.email.S} },
+        UpdateExpression: "set games=:games, elo=:elo",
+        ExpressionAttributeValues: { ":games": {L: games}, ":elo": {N: `${elo}`} }
+    }));
 }
 
 ///
