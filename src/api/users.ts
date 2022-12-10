@@ -32,11 +32,11 @@ const db2user = (item: {[key: string]: AttributeValue}, token?: string): User =>
         email: item.email.S,
         elo: parseInt(item.elo.N),
         games: item.games.L.map((v: AttributeValue, index: number, array: AttributeValue[]) => {
-            const g = v.M!;
+            const g = JSON.parse(v.S || '');
             return {
-                id: g.id.S!,
-                color: g.color.S!,
-                result: g.result.S!,
+                id: g.gameid,
+                color: g.wasWhite ? 'w' : 'b',
+                result: g.result,
             }
         }),
         blurb: item.blurb.S,
@@ -160,4 +160,29 @@ export const createUser = async (token: string, username: string) => {
     }));
 
     return db2user(item);
+}
+
+export const getLeaderboard = async () => {
+    const results = await dbclient.send(new ScanCommand({
+        TableName: "users",
+    }));
+
+    if (results.Items === undefined)
+        return [];
+
+
+    let users = results.Items.map((v: {[key: string]: AttributeValue}) => {
+            const user = db2user(v);
+            return {
+                username: user.username,
+                elo: user.elo,
+            }
+        });
+    users.sort((a, b) => {
+        return b.elo - a.elo;
+    });
+
+    const NUM_USERS = 10;
+    // console.log(users.slice(0, NUM_USERS));
+    return users.slice(0, NUM_USERS);
 }

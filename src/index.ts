@@ -1,6 +1,6 @@
 import { create, get, join, unjoin, queues } from './api/game';
 import { variant, synthesize_game } from './api/variant';
-import { login, getUser, createUser } from './api/users';
+import { login, getUser, createUser, getLeaderboard } from './api/users';
 import { end } from './api/end';
 import express from 'express';
 import cors from 'cors';
@@ -102,6 +102,12 @@ app.post('/auth/user', (req, res) => {
 
 app.post('/auth/create', (req, res) => {
   createUser(req.body.token, req.body.username)
+    .then(result => res.json(result))
+    .catch(err => error(res, err));
+});
+
+app.get('/leaderboard', (_req, res) => {
+  getLeaderboard()
     .then(result => res.json(result))
     .catch(err => error(res, err));
 });
