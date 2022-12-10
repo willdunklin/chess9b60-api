@@ -1,5 +1,7 @@
-import { login, getUser, createUser } from './api';
-import { create, get, join, unjoin, variant, queues, synthesize_game, end } from './api';
+import { create, get, join, unjoin, queues } from './api/game';
+import { variant, synthesize_game } from './api/variant';
+import { login, getUser, createUser } from './api/users';
+import { end } from './api/end';
 import express from 'express';
 import cors from 'cors';
 import { Response } from 'express-serve-static-core';
@@ -118,7 +120,7 @@ const checkTimeout = () => {
   // In each queue check for timed out players
   queues.forEach((queue, i) => {
     for (const player of queue) {
-      console.log(player.token, now - player.time, queue.length);
+      // console.log(player.token, now - player.time, queue.length);
 
       // Remove old players from the queue
       if (now - player.time >= QUEUE_TIMEOUT)

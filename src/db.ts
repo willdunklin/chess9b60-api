@@ -1,5 +1,8 @@
 import { DynamoDBClient, GetItemCommand, UpdateItemCommand } from "@aws-sdk/client-dynamodb";
 import slugify from 'slugify';
+import { creds } from "./creds";
+
+export const dbclient = new DynamoDBClient({ region: 'us-east-2', credentials: creds() });
 
 export async function getGame(client: DynamoDBClient, table: string, id: string) {
     id = slugify(id)
